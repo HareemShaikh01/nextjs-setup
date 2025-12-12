@@ -12,6 +12,7 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export default function PushSubscriptionManager() {
     const [status, setStatus] = useState("");
+    const [subscriptions, setSubscriptions] = useState<any[]>([]);
 
     const subscribeUser = async () => {
         setStatus("Requesting notification permission...");
@@ -34,21 +35,26 @@ export default function PushSubscriptionManager() {
                 ),
             });
 
+            if (!subscription) {
+                setStatus("Subscription failed: subscription is undefined");
+                return;
+            }
+
             console.log("Push subscription:", subscription);
 
             // Send subscription to your FastAPI backend
-            const response = await fetch("https://8b178ff5e08d.ngrok-free.app/subscribe", {
+            const response = await fetch("https://f01b9b718abe.ngrok-free.app/subscribe", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    'ngrok-skip-browser-warning': '1'
-
+                    "ngrok-skip-browser-warning": "1",
                 },
                 body: JSON.stringify(subscription),
             });
 
             if (response.ok) {
-                setStatus("Subscribed and sent to server!");
+                const data = await response.json();
+                setStatus(`Subscribed! Total subscriptions: ${data.subscriptions_count}`);
             } else {
                 const errorText = await response.text();
                 console.error("Backend subscription error:", errorText);
@@ -60,12 +66,38 @@ export default function PushSubscriptionManager() {
         }
     };
 
+    const fetchSubscriptions = async () => {
+        try {
+            const res = await fetch("https://f01b9b718abe.ngrok-free.app/subscriptions", {
+                headers: {
+                    "ngrok-skip-browser-warning": "1",
+                },
+            });
+            if (!res.ok) throw new Error("Failed to fetch subscriptions");
+            const data = await res.json();
+            setSubscriptions(data.subscriptions || []);
+        } catch (err) {
+            console.error(err);
+            setStatus("Failed to fetch subscriptions");
+        }
+    };
+
     return (
-        <div className="p-4">
+        <div className="p-4 space-y-2">
             <p>{status}</p>
-            <button onClick={subscribeUser}>
+            <button onClick={subscribeUser} className="px-4 py-2 bg-blue-500 text-white rounded">
                 Enable Notifications
             </button>
+            <button onClick={fetchSubscriptions} className="px-4 py-2 bg-green-500 text-white rounded">
+                List Subscriptions
+            </button>
+            {subscriptions.length > 0 && (
+                <ul className="mt-2 list-disc pl-5">
+                    {subscriptions.map((sub, idx) => (
+                        <li key={idx}>{sub.endpoint}</li>
+                    ))}
+                </ul>
+            )}
         </div>
     );
 }
